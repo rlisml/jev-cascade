@@ -1,12 +1,12 @@
 # Inference-time compute strategy for (Jev-like) Prefill-Only Decision Models with Confidence Cascades:
 
 **Let a 0.8B model answer like a 4B: re-run only the 25% questions it is least sure
-about — two flat passes, 40% of the extra cost, 96% of the accuracy.**
+about, with two flat passes, 40% of the extra cost, and 96% of the accuracy.**
 
-**Against a 9B model, the same recipe at half the 9B's cost lands within 1pp of it —
+**Against a 9B model, the same recipe at half the 9B's cost lands within 1pp of it,
 and beats random routing at that budget by +8pp.**
 
-**Shrink the menu, keep the answer — and pay only for the questions the small model
+**Shrink the menu, keep the answer, and pay only for the questions the small model
 gets wrong.**
 
 Code for the two main experiment lines of our paper on **prefill-only decision
@@ -20,21 +20,21 @@ label menu in a single forward pass, instead of generating text.
 A confidence cascade costs almost nothing to build for a prefill-only decision model:
 the small model answers over the full menu; the *least-confident fraction* of records
 is re-answered by the larger model. Because that second pass is exactly the large
-model's flat pass, the whole cascade needs only **two flat passes** — no extra
+model's flat pass, the whole cascade needs only **two flat passes**: no extra
 engineering, no thresholding sweeps at deployment.
 
 Real numbers from `cascade_analysis.py` (kev-0.8b → kev-4b, HWU-64 test, cost in
 0.8B-forward units):
 
-| escalation | cost(model size) | cascade acc | random routing @ same cost |
+| escalation | cost | cascade acc | random routing @ same cost |
 |---|---|---|---|
-| r = 0（0.8B） (small model only) | 1.0 | 61.9 | 61.9 |
+| r = 0 (small model only) | 1.0 | 61.9 | 61.9 |
 | **r = 0.25** | **2.0** | **71.6** | 64.4 |
 | r = 0.50 | 3.0 | 72.6 | 66.9 |
-| r = 1.0 (4B) (large model only) | 5.0 | 71.9 | 71.9 |
+| r = 1.0 (large model only) | 5.0 | 71.9 | 71.9 |
 
 Escalating just the 25% least-confident records recovers **96% of the large model's
-accuracy at 40% of the extra cost** — and beats random routing at the same budget by
+accuracy at 40% of the extra cost**, and beats random routing at the same budget by
 **+7.2pp**. The value is in *knowing where the small model is weak*: confidence is a
 good signal of weakness, so the same budget spent on random records buys far less.
 This holds across all five evaluation sources (the paper's §4: escalation dominates
@@ -56,18 +56,18 @@ kev-9b = 11.25 by parameter ratio):
 
 | escalation | cost | cascade acc | random routing @ same cost |
 |---|---|---|---|
-| r = 0 (0.8B) | 1.00 | 70.9 | 70.9 |
+| r = 0 (small model only) | 1.00 | 70.9 | 70.9 |
 | r = 0.25 | 3.56 | 81.5 | 75.4 |
 | **r = 0.50** | **6.12** | **87.9** | 79.8 |
-| r = 1.0 (9B) | 11.25 | 88.7 | 88.7 |
+| r = 1.0 (9B everywhere) | 11.25 | 88.7 | 88.7 |
 
 The r = 0.5 cascade **matches the 9B model (87.9 vs 88.7) at 54% of its cost**, and
 beats random routing at the same budget by **+8.1pp**. The biggest wins are the
-knowledge-heavy sources where the small model is far behind — on ARC the cascade moves
+knowledge-heavy sources where the small model is far behind. On ARC the cascade moves
 61.6 → 67.8 (r = 0.1) → 75.6 (r = 0.25) toward the 9B's 94.4.
 
 **How to get this data.** The seven sources are the kev package's built-in public
-datasets — MMLU, ARC, OpenBookQA, CommonsenseQA, SciQ, AG News, and DBpedia-14 — built
+datasets (MMLU, ARC, OpenBookQA, CommonsenseQA, SciQ, AG News, and DBpedia-14), built
 into the same record format as `data/` by the kev data builder
 (`kev.data.build`, 500 test records per source, seed 0). With those records on disk,
 the pipeline is identical to the 4B cascade above, with `"jaredpalmer/kev-9b"` as the
@@ -80,7 +80,7 @@ python scripts/cascade_analysis.py
 ```
 
 (The shipped `data/` sources power the 4B demo; the seven-source build powers this one.
-Both use the identical record format, so `cascade_kev_pass1.py` takes either — set the
+Both use the identical record format, so `cascade_kev_pass1.py` takes either; set the
 second-stage model via the `MODEL_STAGE2` environment variable, default
 `jaredpalmer/kev-4b`.)
 
@@ -89,7 +89,7 @@ second-stage model via the `MODEL_STAGE2` environment variable, default
 For prefill-only models there is a sharp baseline prediction for what happens when you
 *shrink the candidate menu* before a second pass: restrict the pass-1 distribution to
 the menu, renormalize, read off the answer. When measurement matches prediction, a menu
-redesign is a **zero-labeling intervention simulator** — you can evaluate deployment
+redesign is a **zero-labeling intervention simulator**: you can evaluate deployment
 menus offline. The residual, where it appears, is a fingerprint of presentation
 effects and confusable labels. Seven menu operations probe this (`battery_kev.py` /
 `battery_jev.py`), and `battery_analysis.py` scores the residuals against three
@@ -117,7 +117,7 @@ pre-registered gates.
 | `battery_kev.py` | Menu-operation battery, kev family, local predictor (GPU) |
 | `battery_jev.py` | Menu-operation battery, Open-Jev family, over HTTP |
 | `battery_analysis.py` | Restriction-baseline residuals + the three pre-registered gates |
-| `cascade_kev_pass1.py` | Large-model (kev-4b) flat pass — the cascade's second stage |
+| `cascade_kev_pass1.py` | Large-model (kev-4b) flat pass, the cascade's second stage |
 | `cascade_analysis.py` | Cascade curves vs. a random-routing control |
 | `cascade_tasks.py` | Two-stage small→large cascade over HTTP on hard tasks |
 | `serve_model.sh` | Serves one model with vllm-jev and runs a script against it |
@@ -169,10 +169,10 @@ bash scripts/serve_model.sh 0 8796 ZefanCai/Open-Jev-2B scripts/battery_jev.py g
 
 | Role | Repo |
 |---|---|
-| kev family, small — battery + cascade stage 1 | `jaredpalmer/kev-0.8b` |
-| kev family, large — cascade stage 2 (default) | `jaredpalmer/kev-4b` |
-| kev family, larger — cascade stage 2 alternative | `jaredpalmer/kev-9b` |
-| Open-Jev family — cross-family battery + HTTP cascade | `ZefanCai/Open-Jev-2B` |
+| kev family, small (battery + cascade stage 1) | `jaredpalmer/kev-0.8b` |
+| kev family, large (cascade stage 2, default) | `jaredpalmer/kev-4b` |
+| kev family, larger (cascade stage 2 alternative) | `jaredpalmer/kev-9b` |
+| Open-Jev family (cross-family battery + HTTP cascade) | `ZefanCai/Open-Jev-2B` |
 
 No model weights are included; the inference stacks download them from the repos above.
 
@@ -194,7 +194,7 @@ original public datasets (GoEmotions, MASSIVE, HWU-64, Amazon Toys & Games, SNIP
 ## Reproduction guide (full)
 
 All commands run from the repository root. GPU scripts honor `CUDA_VISIBLE_DEVICES`.
-Everything is resumable — existing per-cell output files under `results/` are skipped
+Everything is resumable: existing per-cell output files under `results/` are skipped
 on re-run.
 
 ### 1. Menu-operation battery, kev family (local predictor)
@@ -210,12 +210,12 @@ python scripts/battery_analysis.py        # -> results/battery_analysis.json
 Each source produces `results/battery_kev/<source>_pass1.json` (flat full-menu
 distributions) plus one `<source>_<cell>.json` per menu cell. `battery_analysis.py`
 then computes, per (model, source, cell): measured accuracy, the restriction
-prediction, the residual, and — for the gold-free cells — the gold hit rate and
+prediction, the residual, and (for the gold-free cells) the gold hit rate and
 gold-conditional accuracy. It evaluates three gates frozen before the runs:
 
-- **G-A1** — restriction baseline: |residual| ≤ 2pp on ≥ 9/10 (source × model) cells
-- **G-A2** — avoid ≥ random − 1pp (otherwise avoidance is dataset-specific)
-- **G-A3** — self2 vs flat sign table, recorded honestly per source
+- **G-A1**, restriction baseline: |residual| ≤ 2pp on ≥ 9/10 (source × model) cells
+- **G-A2**, avoid ≥ random − 1pp (otherwise avoidance is dataset-specific)
+- **G-A3**, self2 vs flat sign table, recorded honestly per source
 
 ### 2. Menu-operation battery, Open-Jev family (vllm-jev HTTP)
 
@@ -272,4 +272,4 @@ python scripts/cascade_tasks.py curve
   by construction (deployment semantics) and skip the model call; hit rate and
   gold-conditional accuracy are reported alongside.
 - The HTTP endpoint contract is a single `POST /v1/systemone` returning per-question
-  `probabilities` — any serving stack with that contract works in place of vllm-jev.
+  `probabilities`; any serving stack with that contract works in place of vllm-jev.
