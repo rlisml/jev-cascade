@@ -1,12 +1,14 @@
-"""Confidence cascade second pass: kev-0.8b -> kev-4b flat pass over one source.
+"""Confidence cascade second pass: kev-0.8b -> a larger kev model, flat pass over one source.
 
 The 0.8B pass-1 distributions come from battery_kev.py (results/battery_kev/<source>_pass1.json).
-This script runs the missing kev-4b flat pass-1 per source; cascade curves are then
-computed offline by cascade_analysis.py (second pass = 4B flat = its pass-1).
+This script runs the missing large-model flat pass-1 per source; cascade curves are
+then computed offline by cascade_analysis.py (second pass = large flat = its pass-1).
+The second-stage model defaults to jaredpalmer/kev-4b; override with MODEL_STAGE2
+(e.g. jaredpalmer/kev-9b). Cost units in cascade_analysis.py assume the 4B default.
 
 Usage: cascade_kev_pass1.py <source>   (GPU via CUDA_VISIBLE_DEVICES)
 Requires: the kev package on PYTHONPATH (set KEV_ROOT to the repo checkout).
-Outputs: results/cascade/<source>_4b_pass1.json
+Outputs: results/cascade/<source>_<stage>_pass1.json
 """
 import json
 import os
@@ -31,16 +33,18 @@ from kev.model import ContextOverflow
 from kev.predictors import LocalPredictor
 
 source = sys.argv[1]
-f = OUT / f"{source}_4b_pass1.json"
+STAGE2 = os.environ.get("MODEL_STAGE2", "jaredpalmer/kev-4b")
+stage = {"jaredpalmer/kev-4b": "4b", "jaredpalmer/kev-9b": "9b"}.get(STAGE2, "stage2")
+f = OUT / f"{source}_{stage}_pass1.json"
 if f.exists():
     print(f"[skip] {source}", flush=True)
     sys.exit(0)
 
 recs = [json.loads(l) for l in open(DATA / f"{source}_test.jsonl", encoding="utf-8")]
 labels = json.load(open(DATA / f"{source}_labels.json"))
-print(f"== {source}: {len(recs)} records, {len(labels)} labels, kev-4b ==", flush=True)
+print(f"== {source}: {len(recs)} records, {len(labels)} labels, {STAGE2} ==", flush=True)
 
-p = LocalPredictor("jaredpalmer/kev-4b", "cuda")
+p = LocalPredictor(STAGE2, "cuda")
 dist, n_ovf, t0 = {}, 0, time.time()
 for i, r in enumerate(recs):
     rec = {"state": r["state"],
@@ -56,9 +60,9 @@ for i, r in enumerate(recs):
         continue
     dist[r["rid"]] = {"label": r["label"], "probs": o["probabilities"][r["qid"]]}
     if (i + 1) % 500 == 0:
-        print(f"{source}_4b: {i+1}/{len(recs)} ({time.time()-t0:.0f}s)", flush=True)
+        print(f"{source}_{stage}: {i+1}/{len(recs)} ({time.time()-t0:.0f}s)", flush=True)
 acc = float(np.mean([max(d["probs"], key=d["probs"].get) == d["label"]
                      for d in dist.values()]))
 json.dump({"dists": dist, "labels": labels, "acc": round(acc, 4)}, open(f, "w"))
-print(f"[done] {source}_4b: acc={acc:.4f} n={len(dist)} ovf={n_ovf} "
+print(f"[done] {source}_{stage}: acc={acc:.4f} n={len(dist)} ovf={n_ovf} "
       f"({time.time()-t0:.0f}s)", flush=True)
