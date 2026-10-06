@@ -26,12 +26,12 @@ engineering, no thresholding sweeps at deployment.
 Real numbers from `cascade_analysis.py` (kev-0.8b → kev-4b, HWU-64 test, cost in
 0.8B-forward units):
 
-| escalation | cost | cascade acc | random routing @ same cost |
+| escalation | cost(model size) | cascade acc | random routing @ same cost |
 |---|---|---|---|
-| r = 0 (small model only) | 1.0 | 61.9 | 61.9 |
+| r = 0（0.8B） (small model only) | 1.0 | 61.9 | 61.9 |
 | **r = 0.25** | **2.0** | **71.6** | 64.4 |
 | r = 0.50 | 3.0 | 72.6 | 66.9 |
-| r = 1.0 (large model only) | 5.0 | 71.9 | 71.9 |
+| r = 1.0 (4B) (large model only) | 5.0 | 71.9 | 71.9 |
 
 Escalating just the 25% least-confident records recovers **96% of the large model's
 accuracy at 40% of the extra cost** — and beats random routing at the same budget by
@@ -56,10 +56,10 @@ kev-9b = 11.25 by parameter ratio):
 
 | escalation | cost | cascade acc | random routing @ same cost |
 |---|---|---|---|
-| r = 0 (small model only) | 1.00 | 70.9 | 70.9 |
+| r = 0 (0.8B) | 1.00 | 70.9 | 70.9 |
 | r = 0.25 | 3.56 | 81.5 | 75.4 |
 | **r = 0.50** | **6.12** | **87.9** | 79.8 |
-| r = 1.0 (9B everywhere) | 11.25 | 88.7 | 88.7 |
+| r = 1.0 (9B) | 11.25 | 88.7 | 88.7 |
 
 The r = 0.5 cascade **matches the 9B model (87.9 vs 88.7) at 54% of its cost**, and
 beats random routing at the same budget by **+8.1pp**. The biggest wins are the
