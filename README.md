@@ -1,5 +1,47 @@
 # Menu-Operation Probe Batteries and Confidence Cascades for Prefill-Only Decision Models
 
+**Shrink the menu, keep the answer — and pay only for the questions the small model
+gets wrong.**
+
+Code for the two main experiment lines of our paper on **prefill-only decision
+models**: models that answer by reading out a full probability distribution over a
+label menu in a single forward pass, instead of generating text.
+
+---
+
+## Demo: escalate, don't re-ask
+
+A confidence cascade costs almost nothing to build for a prefill-only decision model:
+the small model answers over the full menu; the *least-confident fraction* of records
+is re-answered by the larger model. Because that second pass is exactly the large
+model's flat pass, the whole cascade needs only **two flat passes** — no extra
+engineering, no thresholding sweeps at deployment.
+
+Real numbers from `cascade_analysis.py` (kev-0.8b → kev-4b, HWU-64 test, cost in
+0.8B-forward units):
+
+| escalation | cost(model sizes) | cascade acc | random routing @ same cost |
+|---|---|---|---|
+| r = 0 (kev-0.8B) (small model only) | 1.0u | 61.9 | 61.9 |
+| **r = 0.25** | **2.0** | **71.6** | 64.4 |
+| r = 0.50 | 3.0 | 72.6 | 66.9 |
+| r = 1.0 (kev-4B) (large model only) | 5.0u | 71.9 | 71.9 |
+
+Escalating just the 25% least-confident records recovers **96% of the large model's
+accuracy at 40% of the extra cost** — and beats random routing at the same budget by
+**+7.2pp**. The value is in *knowing where the small model is weak*: confidence is a
+good signal of weakness, so the same budget spent on random records buys far less.
+This holds across all five evaluation sources (the paper's §4: escalation dominates
+self-re-asking at every cost point).
+
+Reproduce it yourself:
+
+```bash
+export KEV_ROOT=/path/to/kev-repo
+python scripts/cascade_kev_pass1.py hwu64     # large-model flat pass (second pass)
+python scripts/cascade_analysis.py            # -> results/cascade/cascade_curves.json
+```
+
 Code for reproducing the two main experiment lines of the paper:
 
 1. **Menu-operation probe batteries** (restriction baseline / readout consistency).
